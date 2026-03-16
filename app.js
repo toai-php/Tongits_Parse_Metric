@@ -11,13 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let processedCsvData = null;
     let originalFileName = '';
 
-    // CSV Headers as requested
-    const CSV_HEADERS = [
+    const FIXED_HEADERS = [
         'log_time', 'uId', 'username', 'socialType', 'featureLabel', 
         'abTestCampaign', 'platform', 'country', 'group', 'actionId', 
-        'gold', 'g', 'goldChange', 'gChange', 'extra_1', 'extra_2', 
-        'extra_3', 'extra_4', 'extra_5', 'extra_6', 'extra_7', 'extra_8'
-    ].join(',');
+        'gold', 'g', 'goldChange', 'gChange'
+    ];
 
     // Drag & Drop handlers
     dropZone.addEventListener('dragover', (e) => {
@@ -70,15 +68,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const logText = await contents.files[logFileName].async('text');
             
             showStatus('Đang trích xuất dữ liệu...');
-            const csvRows = processLogData(logText);
+            const result = processLogData(logText);
             
-            if (csvRows.length === 0) {
+            if (result.rows.length === 0) {
                 throw new Error('Không tìm thấy dữ liệu MetricLog phù hợp.');
             }
 
-            processedCsvData = CSV_HEADERS + '\n' + csvRows.join('\n');
+            processedCsvData = result.header + '\n' + result.rows.join('\n');
             
-            showResult(csvRows.length);
+            showResult(result.rows.length);
         } catch (error) {
             alert('Lỗi: ' + error.message);
             resetBtn.click();
@@ -87,34 +85,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function processLogData(text) {
         const lines = text.split(/\r?\n/);
-        const rows = [];
+        const allDataFields = [];
         const pattern = 'MetricLog ---  log: ';
+        let maxFields = FIXED_HEADERS.length;
 
         lines.forEach(line => {
             if (line.includes(pattern)) {
-                // Extract part after 'log: '
                 const parts = line.split(pattern);
                 if (parts.length > 1) {
                     const rawData = parts[1].trim();
-                    // Split by | (preserving empty elements)
                     const fields = rawData.split('|');
-                    
-                    // Join back with comma for CSV, ensuring proper escaping if needed
-                    // (Simple version: just join, but for production robust CSV we usually escape quotes)
-                    const csvRow = fields.map(field => {
-                        // Escape quotes and wrap in quotes if contains comma
-                        if (field.includes(',') || field.includes('"') || field.includes('\n')) {
-                            return `"${field.replace(/"/g, '""')}"`;
-                        }
-                        return field;
-                    }).join(',');
-                    
-                    rows.push(csvRow);
+                    allDataFields.push(fields);
+                    if (fields.length > maxFields) {
+                        maxFields = fields.length;
+                    }
                 }
             }
         });
 
-        return rows;
+        // Generate Header
+        const headers = [...FIXED_HEADERS];
+        for (let i = 1; i <= (maxFields - FIXED_HEADERS.length); i++) {
+            headers.push(`extra_${i}`);
+        }
+
+        // Process rows and pad if necessary
+        const rows = allDataFields.map(fields => {
+            // Pad fields to maxFields
+            const paddedFields = [...fields];
+            while (paddedFields.length < maxFields) {
+                paddedFields.push('');
+            }
+
+            return paddedFields.map(field => {
+                if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+                    return `"${field.replace(/"/g, '""')}"`;
+                }
+                return field;
+            }).join(',');
+        });
+
+        return {
+            header: headers.join(','),
+            rows: rows
+        };
     }
 
     function showStatus(text) {
