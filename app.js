@@ -86,18 +86,34 @@ document.addEventListener('DOMContentLoaded', () => {
     function processLogData(text) {
         const lines = text.split(/\r?\n/);
         const allDataFields = [];
-        const pattern = 'MetricLog ---  log: ';
+        const keyword = 'MetricLog';
         let maxFields = FIXED_HEADERS.length;
 
         lines.forEach(line => {
-            if (line.includes(pattern)) {
-                const parts = line.split(pattern);
-                if (parts.length > 1) {
-                    const rawData = parts[1].trim();
+            if (line.includes(keyword) && line.includes('|')) {
+                // Find where the structured data starts (usually after --- or : )
+                // We'll look for the first occurrence of '|' and then backtrack to find the start of the data segment
+                const firstPipeIndex = line.indexOf('|');
+                if (firstPipeIndex !== -1) {
+                    // Extract the segment containing pipes. 
+                    // Usually the data follows a pattern like "... MetricLog --- log: data|data..."
+                    // We'll take the part from MetricLog onwards and then find the first significant separator
+                    const metricSegment = line.substring(line.indexOf(keyword));
+                    
+                    // The data starts after the last ' ' or ':' before the first '|'
+                    const segmentBeforePipe = line.substring(0, firstPipeIndex);
+                    const lastSpace = segmentBeforePipe.lastIndexOf(' ');
+                    const lastColon = segmentBeforePipe.lastIndexOf(':');
+                    const dataStartIndex = Math.max(lastSpace, lastColon) + 1;
+                    
+                    const rawData = line.substring(dataStartIndex).trim();
                     const fields = rawData.split('|');
-                    allDataFields.push(fields);
-                    if (fields.length > maxFields) {
-                        maxFields = fields.length;
+                    
+                    if (fields.length > 1) { // Ensure it's actually delimited data
+                        allDataFields.push(fields);
+                        if (fields.length > maxFields) {
+                            maxFields = fields.length;
+                        }
                     }
                 }
             }
