@@ -4,11 +4,186 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tongits Metric Log Parser</title>
-    <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1.6;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        header {
+            margin-bottom: 3rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-muted);
+        }
+
+        .drop-zone {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 2px dashed var(--border);
+            border-radius: 24px;
+            padding: 4rem 2rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--primary);
+            background: rgba(30, 41, 59, 0.9);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .drop-zone .icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .drop-zone p {
+            margin-bottom: 1rem;
+        }
+
+        .file-label {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .file-label:hover {
+            background: var(--primary-hover);
+            transform: scale(1.05);
+        }
+
+        .status-container, .result-container {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 3rem 2rem;
+            margin-top: 1rem;
+        }
+
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid var(--border);
+            border-bottom-color: var(--primary);
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+            margin-bottom: 1.5rem;
+        }
+
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn.primary {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn.primary:hover {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+        }
+
+        .btn.secondary {
+            background: var(--border);
+            color: var(--text-main);
+        }
+
+        .btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        footer {
+            margin-top: 3rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -48,6 +223,174 @@
             <p>&copy; 2026 Tongits Metric Tool. Hoàn toàn bảo mật (xử lý trên trình duyệt).</p>
         </footer>
     </div>
-    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+            const statusContainer = document.getElementById('status-container');
+            const resultContainer = document.getElementById('result-container');
+            const statusText = document.getElementById('status-text');
+            const fileInfo = document.getElementById('file-info');
+            const downloadBtn = document.getElementById('download-btn');
+            const resetBtn = document.getElementById('reset-btn');
+
+            let processedCsvData = null;
+            let originalFileName = '';
+
+            const FIXED_HEADERS = [
+                'log_time', 'uId', 'username', 'socialType', 'featureLabel', 
+                'abTestCampaign', 'platform', 'country', 'group', 'actionId', 
+                'gold', 'g', 'goldChange', 'gChange'
+            ];
+
+            // Drag & Drop handlers
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                const file = e.dataTransfer.files[0];
+                if (file && file.name.endsWith('.zip')) {
+                    handleFile(file);
+                } else {
+                    alert('Vui lòng chỉ tải lên file .zip');
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) handleFile(file);
+            });
+
+            resetBtn.addEventListener('click', () => {
+                resultContainer.classList.add('hidden');
+                dropZone.classList.remove('hidden');
+                fileInput.value = '';
+            });
+
+            async function handleFile(file) {
+                originalFileName = file.name.replace('.zip', '');
+                showStatus('Đang mở file ZIP...');
+                
+                try {
+                    const zip = new JSZip();
+                    const contents = await zip.loadAsync(file);
+                    
+                    const logFileName = Object.keys(contents.files).find(name => name.endsWith('.log'));
+                    
+                    if (!logFileName) {
+                        throw new Error('Không tìm thấy file .log trong file ZIP.');
+                    }
+
+                    showStatus('Đang đọc file log...');
+                    const logText = await contents.files[logFileName].async('text');
+                    
+                    showStatus('Đang trích xuất dữ liệu...');
+                    const result = processLogData(logText);
+                    
+                    if (result.rows.length === 0) {
+                        throw new Error('Không tìm thấy dữ liệu MetricLog phù hợp.');
+                    }
+
+                    processedCsvData = result.header + '\n' + result.rows.join('\n');
+                    
+                    showResult(result.rows.length);
+                } catch (error) {
+                    alert('Lỗi: ' + error.message);
+                    resetBtn.click();
+                }
+            }
+
+            function processLogData(text) {
+                const lines = text.split(/\r?\n/);
+                const allDataFields = [];
+                const keyword = 'MetricLog';
+                let maxFields = FIXED_HEADERS.length;
+
+                lines.forEach(line => {
+                    if (line.includes(keyword) && line.includes('|')) {
+                        const firstPipeIndex = line.indexOf('|');
+                        if (firstPipeIndex !== -1) {
+                            const segmentBeforePipe = line.substring(0, firstPipeIndex);
+                            const lastSpace = segmentBeforePipe.lastIndexOf(' ');
+                            const lastColon = segmentBeforePipe.lastIndexOf(':');
+                            const dataStartIndex = Math.max(lastSpace, lastColon) + 1;
+                            
+                            const rawData = line.substring(dataStartIndex).trim();
+                            const fields = rawData.split('|');
+                            
+                            if (fields.length > 1) {
+                                allDataFields.push(fields);
+                                if (fields.length > maxFields) {
+                                    maxFields = fields.length;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                const headers = [...FIXED_HEADERS];
+                for (let i = 1; i <= (maxFields - FIXED_HEADERS.length); i++) {
+                    headers.push(`extra_${i}`);
+                }
+
+                const rows = allDataFields.map(fields => {
+                    const paddedFields = [...fields];
+                    while (paddedFields.length < maxFields) {
+                        paddedFields.push('');
+                    }
+
+                    return paddedFields.map(field => {
+                        if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+                            return `"${field.replace(/"/g, '""')}"`;
+                        }
+                        return field;
+                    }).join(',');
+                });
+
+                return {
+                    header: headers.join(','),
+                    rows: rows
+                };
+            }
+
+            function showStatus(text) {
+                dropZone.classList.add('hidden');
+                resultContainer.classList.add('hidden');
+                statusContainer.classList.remove('hidden');
+                statusText.innerText = text;
+            }
+
+            function showResult(rowCount) {
+                statusContainer.classList.add('hidden');
+                resultContainer.classList.remove('hidden');
+                fileInfo.innerText = `Đã tìm thấy ${rowCount} bản ghi metric.`;
+            }
+
+            downloadBtn.addEventListener('click', () => {
+                if (!processedCsvData) return;
+
+                const timestamp = new Date().getTime();
+                const blob = new Blob([processedCsvData], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', `metric_log_${timestamp}.csv`);
+                link.style.visibility = 'hidden';
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+        });
+    </script>
 </body>
 </html>
